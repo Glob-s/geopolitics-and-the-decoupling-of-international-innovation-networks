@@ -28,9 +28,11 @@ The core result is striking. After an animosity shock, co-invention intensity be
 ## Visuals
 
 <img src="assets/fig1.png" alt="Figure 1: Taiwan Semiconductor Manufacturing Co. Fab 12B at dusk, one of the strategic infrastructures around which contemporary innovation rivalry is organized. Photo credit: 曾成訓 / Wikimedia Commons (CC BY 2.0)" width="100%"/>
+
 *Figure 1: Taiwan Semiconductor Manufacturing Co. Fab 12B at dusk, one of the strategic infrastructures around which contemporary innovation rivalry is organized. Photo credit: 曾成訓 / Wikimedia Commons (CC BY 2.0).*
 
 ---
 
 <img src="assets/fig2.png" alt="Figure 2: Estimated post-shock changes in bilateral innovation channels after an animosity shock. Values draw from the project draft and are presented for website communication" width="100%"/>
+
 *Figure 2: Estimated post-shock changes in bilateral innovation channels after an animosity shock. Values draw from the project draft and are presented for website communication.*

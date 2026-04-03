@@ -1,0 +1,789 @@
+--------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /projectnb/glob-s/Khoa/geopolitical-shocks-innovation/logs/brsi_eve
+> ntstudy_baseline.log
+  log type:  text
+ opened on:   5 Dec 2025, 20:27:33
+
+. 
+. * L = number of pre-shock years included
+. * H = number of post-shock years included
+. global L = 3      // pre: -3, -2, -1
+
+. global H = 5      // post: 0, 1, 2, 3, 4, 5
+
+. 
+. * Relative-year dummies to estimate (omit -1 as baseline)
+. global rel_list -3 -2 0 1 2 3 4 5
+
+. global relvars rel_m3 rel_m2 rel_0 rel_1 rel_2 rel_3 rel_4 rel_5
+
+. 
+. *******************************************************
+. * 0.1 Required packages
+. *******************************************************
+. 
+. cap which ppmlhdfe
+
+. if _rc ssc install ppmlhdfe, replace
+
+. 
+. cap which reghdfe
+
+. if _rc ssc install reghdfe, replace
+
+. 
+. cap which coefplot
+
+. if _rc ssc install coefplot, replace
+
+. 
+. do "utils.do"
+
+. cap program drop _add_pooled_effects
+
+. program define _add_pooled_effects
+  1.         version 18.0
+  2.         syntax , VARS(string) TITLE(string)
+  3.         local n: word count(`vars')
+  4.         local expr ""
+  5.         foreach v of local vars{
+  6.                 if "`expr'" == "" {
+  7.                         local expr "`v'"
+  8.                 }
+  9.                 else {
+ 10.                         local expr "`expr' + `v'"
+ 11.                 }
+ 12.         }
+ 13.         putdocx paragraph, style(Heading3)
+ 14.         putdocx text ("`title'")
+ 15.         quietly lincom (`expr')/`n'
+ 16.         putdocx table eff = (2, 6)
+ 17.         putdocx table eff(1,1) = ("Coefficient"), bold
+ 18.         putdocx table eff(1,2) = ("Std. err."), bold
+ 19.         putdocx table eff(1,3) = ("z"), bold
+ 20.         putdocx table eff(1,4) = ("p-value"), bold
+ 21.         putdocx table eff(1,5) = ("95% l"), bold
+ 22.         putdocx table eff(1,6) = ("95% u"), bold
+ 23.         putdocx table eff(2,1) = (strofreal(r(estimate), "$NUMFMT"))
+ 24.         putdocx table eff(2,2) = (strofreal(r(se), "$NUMFMT"))
+ 25.         putdocx table eff(2,3) = (strofreal(r(z), "$NUMFMT"))
+ 26.         putdocx table eff(2,4) = (strofreal(r(p), "$NUMFMT"))
+ 27.         putdocx table eff(2,5) = (strofreal(r(lb), "$NUMFMT"))
+ 28.         putdocx table eff(2,6) = (strofreal(r(ub), "$NUMFMT"))
+ 29. end
+
+. 
+. cap program drop _export_table_with_plot
+
+. program define _export_table_with_plot
+  1.     version 18.0
+  2.     syntax , DV(string) ES(string) TITLE(string) OUTDOC(string) NTREAT(real
+> ) NCTRL(real)
+  3.     
+.     matrix coefs = r(table)
+  4.     
+.     preserve
+  5.         * PNG path
+.         local outpng = subinstr("`outdoc'","tables/","figs/",.)
+  6.         local outpng = subinstr("`outpng'",".docx",".png",.)
+  7. 
+.         coefplot `es', ///
+>             keep($relvars) ///
+>             xline(3) vertical ///
+>             xlabel(1 "-3" 2 "-2" 3 "0" 4 "1" 5 "2" 6 "3" 7 "4" 8 "5") ///
+>             ytitle("Effect on `dv'") ///
+>             xtitle("Years relative to BRSI shock")
+  8.            
+.         graph export "`outpng'", replace
+  9. 
+.         * DOCX export
+.         putdocx clear
+ 10.         putdocx begin, pagesize(letter) font("Arial",10)
+ 11.         putdocx paragraph, style(Heading1)
+ 12.         putdocx text ("`title'")
+ 13.         
+.         putdocx paragraph, style(Heading2)
+ 14.         putdocx text ("Event-time dynamics (-$L..$H)")
+ 15.         matrix table_transposed = coefs'
+ 16.         putdocx table t1 = matrix(table_transposed), rownames colnames nfor
+> mat("$NUMFMT")
+ 17.         
+.         * Pooled effects
+.         putdocx paragraph, style(Heading2)
+ 18.         putdocx text ("Pooled effects")
+ 19.         
+.         * Pre-trend
+.         _add_pooled_effects, vars("rel_m3 rel_m2") title("Pre-treatment effect
+> s (-3 -2)")
+ 20.         
+.         * Post-avg
+.         _add_pooled_effects, vars("rel_0 rel_1 rel_2 rel_3 rel_4 rel_5") title
+> ("Post-treatment effects (0 5)")
+ 21.         
+.         * Short-run 
+.         _add_pooled_effects, vars("rel_0 rel_1") title("Short-run effects (0 1
+> )")
+ 22.         
+.         * Medium-run
+.         _add_pooled_effects, vars("rel_2 rel_3") title("Medium-run effects (2 
+> 3)")
+ 23.         
+.         * Long-run
+.         _add_pooled_effects, vars("rel_4 rel_5") title("Long-run effects (4 5)
+> ")
+ 24.         
+.         * Chi-2 and degrees of freedom
+.         local chi2 = e(chi2)
+ 25.         local df = e(df)
+ 26.         putdocx paragraph, style(Heading2)
+ 27.         putdocx text ("Chi2: `chi2'")
+ 28.         putdocx paragraph, style(Heading2)
+ 29.         putdocx text ("df: `df'")
+ 30.         
+.         putdocx paragraph, style(Heading2)
+ 31.         putdocx text ("Degrees of freedom table")
+ 32.         matrix dof_table = e(dof_table)
+ 33.         putdocx table df_table = matrix(dof_table), rownames colnames nform
+> at("$NUMFMT")
+ 34.         
+.         * Wald tests
+.         putdocx paragraph, style(Heading2)
+ 35.         putdocx text ("Wald Tests. H0: coefs = 0")
+ 36.         
+.         * Pre-trend
+.         putdocx paragraph, style(Heading2)
+ 37.         putdocx text ("Pre-trend: -3 -2")
+ 38.         quietly test rel_m3 rel_m2
+ 39.         putdocx table preWald = (3, 2)
+ 40.         putdocx table preWald(1,1) = ("chi2"), bold
+ 41.         putdocx table preWald(1,2) = (strofreal(r(chi2), "$NUMFMT"))
+ 42.         putdocx table preWald(2,1) = ("df"), bold
+ 43.         putdocx table preWald(2,2) = (strofreal(r(df), "$NUMFMT"))
+ 44.         putdocx table preWald(3,1) = ("p-value"), bold
+ 45.         putdocx table preWald(3,2) = (strofreal(r(p), "$NUMFMT"))
+ 46.         
+.         * Short-run
+.         putdocx paragraph, style(Heading2)
+ 47.         putdocx text ("Short-run: 0 1")
+ 48.         quietly test rel_0 rel_1
+ 49.         putdocx table srWald = (3, 2)
+ 50.         putdocx table srWald(1,1) = ("chi2"), bold
+ 51.         putdocx table srWald(1,2) = (strofreal(r(chi2), "$NUMFMT"))
+ 52.         putdocx table srWald(2,1) = ("df"), bold
+ 53.         putdocx table srWald(2,2) = (strofreal(r(df), "$NUMFMT"))
+ 54.         putdocx table srWald(3,1) = ("p-value"), bold
+ 55.         putdocx table srWald(3,2) = (strofreal(r(p), "$NUMFMT"))
+ 56.         
+.         * Medium-run
+.         putdocx paragraph, style(Heading2)
+ 57.         putdocx text ("Medium-run: 2 3")
+ 58.         quietly test rel_2 rel_3
+ 59.         putdocx table mrWald = (3, 2)
+ 60.         putdocx table mrWald(1,1) = ("chi2"), bold
+ 61.         putdocx table mrWald(1,2) = (strofreal(r(chi2), "$NUMFMT"))
+ 62.         putdocx table mrWald(2,1) = ("df"), bold
+ 63.         putdocx table mrWald(2,2) = (strofreal(r(df), "$NUMFMT"))
+ 64.         putdocx table mrWald(3,1) = ("p-value"), bold
+ 65.         putdocx table mrWald(3,2) = (strofreal(r(p), "$NUMFMT"))
+ 66.         
+.         * Long-run
+.         putdocx paragraph, style(Heading2)
+ 67.         putdocx text ("Long-run: 4 5")
+ 68.         quietly test rel_4 rel_5
+ 69.         putdocx table lrWald = (3, 2)
+ 70.         putdocx table lrWald(1,1) = ("chi2"), bold
+ 71.         putdocx table lrWald(1,2) = (strofreal(r(chi2), "$NUMFMT"))
+ 72.         putdocx table lrWald(2,1) = ("df"), bold
+ 73.         putdocx table lrWald(2,2) = (strofreal(r(df), "$NUMFMT"))
+ 74.         putdocx table lrWald(3,1) = ("p-value"), bold
+ 75.         putdocx table lrWald(3,2) = (strofreal(r(p), "$NUMFMT"))
+ 76.         
+.         * Number of observations (total)
+.         local N = e(N)
+ 77.         
+.         * Number of singletons
+.         local N_singletons = e(num_singletons)
+ 78.         
+.         * Number of absorbed fixed effects
+.         local N_hdfe = e(N_hdfe)
+ 79.         
+.         putdocx table obs = (5, 2)
+ 80.         putdocx table obs(1,1) = ("N Obs"), bold
+ 81.         putdocx table obs(1,2) = ("`N'")
+ 82.         putdocx table obs(2,1) = ("N Singletons"), bold
+ 83.         putdocx table obs(2,2) = ("`N_singletons'")
+ 84.         putdocx table obs(3,1) = ("N Absorbed Fixed Effects"), bold
+ 85.         putdocx table obs(3,2) = ("`N_hdfe'")
+ 86.         putdocx table obs(4,1) = ("N Treated"), bold
+ 87.         putdocx table obs(4,2) = (strofreal(`ntreat'))
+ 88.         putdocx table obs(5,1) = ("N Control"), bold
+ 89.         putdocx table obs(5,2) = (strofreal(`nctrl'))
+ 90.         
+.         putdocx paragraph, style(Heading2)
+ 91.         putdocx text ("Figure saved to: `outpng'")
+ 92.         putdocx save "`outdoc'", replace
+ 93.         
+.     restore
+ 94. end
+
+. 
+. capture program drop _treated_control_counts
+
+. program define _treated_control_counts, rclass
+  1.         syntax varlist, ID(varname)
+  2.         di "`varlist'"
+  3.         preserve
+  4.                 keep `id' `varlist'
+  5.                 bys `id': egen ever_shock = max(`varlist')
+  6.                 bys `id': keep if _n == 1
+  7.                 count if ever_shock == 1
+  8.                 return scalar N_treated = r(N)
+  9.                 count if ever_shock == 0
+ 10.                 return scalar N_control = r(N)
+ 11.         restore
+ 12. end
+
+. 
+end of do-file
+
+. 
+. *******************************************************
+. * 1. CO-INVENTION: stacked event study on collab_brsi_annual
+. *******************************************************
+. 
+. *------------------------------------------------------
+. * 1.1 Load data and define dyads and shocks
+. *------------------------------------------------------
+. 
+. use "$data/collab_brsi_annual.dta", clear
+
+. 
+. * Expected variables:
+. *   country_i   country_j   year
+. *   collaboration_int   edge
+. *   shock_i_to_j_year   shock_j_to_i_year
+. 
+. keep if inrange(year, 2000, 2023)
+(0 observations deleted)
+
+. 
+. * Unordered dyad ID
+. egen dyad_id = group(country_i country_j), label
+
+. 
+. * Single shock indicator for dyad in year t
+. gen shock_ij_year = (shock_i_to_j_year == 1 | shock_j_to_i_year == 1)
+
+. 
+. _treated_control_counts shock_ij_year, id(dyad_id)
+shock_ij_year
+(439,530 observations deleted)
+  6,342
+  12,768
+
+. scalar N_treated_collab = r(N_treated)
+
+. scalar N_control_collab = r(N_control)
+
+. 
+. *------------------------------------------------------
+. * 1.2 Create event list with non-overlapping windows
+. *------------------------------------------------------
+. 
+. preserve
+
+.     keep dyad_id year shock_ij_year
+
+.     keep if shock_ij_year == 1
+(440,479 observations deleted)
+
+.     keep dyad_id year
+
+.     rename year event_year
+
+.     sort dyad_id event_year
+
+. 
+.     * Drop events whose windows would overlap within the same dyad
+.     by dyad_id: gen event_gap = event_year - event_year[_n-1]
+(6,342 missing values generated)
+
+.     gen keep_event = 1
+
+.     replace keep_event = 0 if _n > 1 & event_gap < ($L + $H + 1)
+(11,164 real changes made)
+
+. 
+.     keep if keep_event == 1
+(11,164 observations deleted)
+
+.     drop event_gap keep_event
+
+. 
+.     by dyad_id: gen event_id = _n
+
+. 
+.     tempfile collab_events
+
+.     save `collab_events', replace
+(file /scratch/2103229.1.p-int/St2198330.000002 not found)
+file /scratch/2103229.1.p-int/St2198330.000002 saved as .dta format
+
+. restore
+
+. 
+. tempfile collab_base
+
+. save `collab_base', replace
+(file /scratch/2103229.1.p-int/St2198330.000003 not found)
+file /scratch/2103229.1.p-int/St2198330.000003 saved as .dta format
+
+. 
+. *------------------------------------------------------
+. * 1.3 Build stacked event-study panel for co-invention
+. *------------------------------------------------------
+. 
+. use `collab_base', clear
+
+. joinby dyad_id using `collab_events'
+
+. 
+. * Relative year around event
+. gen rel_year = year - event_year
+
+. 
+. * Restrict to event-study window
+. keep if rel_year >= -$L & rel_year <= $H
+(109,577 observations deleted)
+
+. 
+. * For any dyad-year that falls into more than one event window,
+. * keep the earliest event (smallest event_year)
+. sort dyad_id year event_year
+
+. by dyad_id year: keep if _n == 1
+(0 observations deleted)
+
+. 
+. * Event-time dummies; omit rel_year = -1 as baseline
+. 
+. foreach r of global rel_list {
+  2.         local relname = cond(`r' < 0, "rel_m" + strofreal(-`r'), "rel_" + s
+> trofreal(`r'))
+  3.         gen `relname' = (rel_year == `r')
+  4. }
+
+. drop rel_year
+
+. 
+. tempfile collab_es
+
+. save `collab_es', replace
+(file /scratch/2103229.1.p-int/St2198330.000004 not found)
+file /scratch/2103229.1.p-int/St2198330.000004 saved as .dta format
+
+. 
+. *------------------------------------------------------
+. * 1.4 PPML for co-invention intensity
+. *------------------------------------------------------
+. 
+. use `collab_es', clear
+
+. 
+. ppmlhdfe collaboration_int ///
+>     rel_* , ///
+>     absorb(dyad_id year) ///
+>     cluster(dyad_id)
+(dropped 43091 observations that are either singletons or separated by a fixed e
+> ffect)
+Iteration 1:   deviance = 4.8184e+04  eps = .         iters = 7    tol = 1.0e-04
+>   min(eta) =  -4.44  P   
+Iteration 2:   deviance = 2.0917e+04  eps = 1.30e+00  iters = 6    tol = 1.0e-04
+>   min(eta) =  -5.73      
+Iteration 3:   deviance = 1.5953e+04  eps = 3.11e-01  iters = 6    tol = 1.0e-04
+>   min(eta) =  -6.90      
+Iteration 4:   deviance = 1.4954e+04  eps = 6.68e-02  iters = 6    tol = 1.0e-04
+>   min(eta) =  -7.87      
+Iteration 5:   deviance = 1.4776e+04  eps = 1.20e-02  iters = 5    tol = 1.0e-04
+>   min(eta) =  -8.79      
+Iteration 6:   deviance = 1.4752e+04  eps = 1.60e-03  iters = 4    tol = 1.0e-04
+>   min(eta) =  -9.58      
+Iteration 7:   deviance = 1.4750e+04  eps = 1.35e-04  iters = 3    tol = 1.0e-04
+>   min(eta) = -10.13      
+Iteration 8:   deviance = 1.4750e+04  eps = 6.80e-06  iters = 2    tol = 1.0e-04
+>   min(eta) = -10.35      
+Iteration 9:   deviance = 1.4750e+04  eps = 1.77e-07  iters = 2    tol = 1.0e-05
+>   min(eta) = -10.39   S  
+Iteration 10:  deviance = 1.4750e+04  eps = 7.48e-10  iters = 4    tol = 1.0e-07
+>   min(eta) = -10.40   S  
+Iteration 11:  deviance = 1.4750e+04  eps = 3.35e-14  iters = 4    tol = 1.0e-08
+>   min(eta) = -10.40   S  
+Iteration 12:  deviance = 1.4750e+04  eps = 0.00e+00  iters = 2    tol = 1.0e-09
+>   min(eta) = -10.40   S O
+--------------------------------------------------------------------------------
+> ----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon b
+> elow tolerance)
+Converged in 12 iterations and 51 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     15,260
+Absorbing 2 HDFE groups                           Residual df     =      1,626
+Statistics robust to heteroskedasticity           Wald chi2(8)    =      40.98
+Deviance             =  14750.24122               Prob > chi2     =     0.0000
+Log pseudolikelihood = -16530.78489               Pseudo R2       =     0.9544
+
+Number of clusters (dyad_id)=      1,627
+                            (Std. err. adjusted for 1,627 clusters in dyad_id)
+------------------------------------------------------------------------------
+             |               Robust
+collaborat~t | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      rel_m3 |   .0726928   .0425645     1.71   0.088    -.0107321    .1561177
+      rel_m2 |   .0115772   .0233287     0.50   0.620    -.0341463    .0573007
+       rel_0 |  -.1015352   .0232786    -4.36   0.000    -.1471605   -.0559099
+       rel_1 |  -.2045591   .0369092    -5.54   0.000    -.2768998   -.1322184
+       rel_2 |  -.2817598   .0515597    -5.46   0.000     -.382815   -.1807047
+       rel_3 |  -.3182474   .0687596    -4.63   0.000    -.4530137   -.1834811
+       rel_4 |  -.3628896   .0835354    -4.34   0.000     -.526616   -.1991632
+       rel_5 |  -.3952206   .0926686    -4.26   0.000    -.5768477   -.2135936
+       _cons |   5.300484   .0412392   128.53   0.000     5.219657    5.381312
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     dyad_id |      1627        1627           0    *|
+        year |        23           1          22     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. 
+. estimates store ppml_collab
+
+. 
+. _export_table_with_plot, dv(collaboration_int) es(ppml_collab) title("PPML for
+>  co-invention intensity") outdoc("$tables/eventstudy_collab_ppml.docx") ntreat
+> (`=N_treated_collab') nctrl(`=N_control_collab')
+file ./figs/eventstudy_collab_ppml.png saved as PNG format
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+successfully replaced "/projectnb/glob-s/Khoa/geopolitical-shocks-innovation/tab
+> les/eventstudy_collab_ppml.docx"
+
+. 
+. *------------------------------------------------------
+. * 1.5 LPM for co-invention edge (extensive margin)
+. *------------------------------------------------------
+. 
+. reghdfe edge ///
+>     rel_* , ///
+>     absorb(dyad_id year) ///
+>     vce(cluster dyad_id)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     58,351
+Absorbing 2 HDFE groups                           F(   8,   6341) =       1.65
+Statistics robust to heteroskedasticity           Prob > F        =     0.1056
+                                                  R-squared       =     0.6607
+                                                  Adj R-squared   =     0.6191
+                                                  Within R-sq.    =     0.0003
+Number of clusters (dyad_id) =      6,342         Root MSE        =     0.1974
+
+                            (Std. err. adjusted for 6,342 clusters in dyad_id)
+------------------------------------------------------------------------------
+             |               Robust
+        edge | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      rel_m3 |   .0052565   .0036253     1.45   0.147    -.0018504    .0123634
+      rel_m2 |  -.0012394   .0031961    -0.39   0.698    -.0075047     .005026
+       rel_0 |  -.0014657   .0031439    -0.47   0.641    -.0076288    .0046973
+       rel_1 |  -.0028481   .0036272    -0.79   0.432    -.0099586    .0042623
+       rel_2 |  -.0005491   .0038506    -0.14   0.887    -.0080976    .0069993
+       rel_3 |   .0008034    .004279     0.19   0.851    -.0075849    .0091918
+       rel_4 |   .0029374   .0046752     0.63   0.530    -.0062276    .0121025
+       rel_5 |   .0082078   .0051386     1.60   0.110    -.0018655    .0182811
+       _cons |   .1145608   .0026249    43.64   0.000      .109415    .1197065
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     dyad_id |      6342        6342           0    *|
+        year |        24           1          23     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. 
+. estimates store lpm_edge
+
+. 
+. _export_table_with_plot, dv(edge) es(lpm_edge) title("LPM for co-invention edg
+> e") outdoc("$tables/eventstudy_collab_edge.docx") ntreat(`=N_treated_collab') 
+> nctrl(`=N_control_collab')
+file ./figs/eventstudy_collab_edge.png saved as PNG format
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+successfully replaced "/projectnb/glob-s/Khoa/geopolitical-shocks-innovation/tab
+> les/eventstudy_collab_edge.docx"
+
+. 
+. *******************************************************
+. * 2. CITATIONS: stacked event study on citations_brsi_annual
+. *******************************************************
+. 
+. *------------------------------------------------------
+. * 2.1 Load data and define IDs and shocks
+. *------------------------------------------------------
+. 
+. use "$data/citations_brsi_annual.dta", clear
+
+. 
+. * Expected variables:
+. *   source_j   target_i   year
+. *   cite_frac  cite_share  n_citations
+. *   shock_j_to_i_year
+. 
+. keep if inrange(year, 2000, 2023)
+(0 observations deleted)
+
+. 
+. * Directed dyad ID
+. egen dyad_id = group(source_j target_i), label
+
+. 
+. * Exporter-year and importer-year IDs
+. egen source_year = group(source_j year)
+
+. egen target_year = group(target_i year)
+
+. 
+. _treated_control_counts shock_j_to_i_year, id(dyad_id)
+shock_j_to_i_year
+(883,568 observations deleted)
+  11,672
+  26,744
+
+. scalar N_treated_cites = r(N_treated)
+
+. scalar N_control_cites = r(N_control)
+
+. 
+. *------------------------------------------------------
+. * 2.2 Create event list with non-overlapping windows
+. *------------------------------------------------------
+. 
+. preserve
+
+.     keep dyad_id year shock_j_to_i_year
+
+.     keep if shock_j_to_i_year == 1
+(901,184 observations deleted)
+
+.     keep dyad_id year
+
+.     rename year event_year
+
+.     sort dyad_id event_year
+
+. 
+.     by dyad_id: gen event_gap = event_year - event_year[_n-1]
+(11,672 missing values generated)
+
+.     gen keep_event = 1
+
+.     replace keep_event = 0 if _n > 1 & event_gap < ($L + $H + 1)
+(8,761 real changes made)
+
+. 
+.     keep if keep_event == 1
+(8,761 observations deleted)
+
+.     drop event_gap keep_event
+
+. 
+.     by dyad_id: gen event_id = _n
+
+. 
+.     tempfile cites_events
+
+.     save `cites_events', replace
+(file /scratch/2103229.1.p-int/St2198330.000006 not found)
+file /scratch/2103229.1.p-int/St2198330.000006 saved as .dta format
+
+. restore
+
+. 
+. tempfile cites_base
+
+. save `cites_base', replace
+(file /scratch/2103229.1.p-int/St2198330.000007 not found)
+file /scratch/2103229.1.p-int/St2198330.000007 saved as .dta format
+
+. 
+. *------------------------------------------------------
+. * 2.3 Build stacked event-study panel for citations
+. *------------------------------------------------------
+. 
+. use `cites_base', clear
+
+. joinby dyad_id using `cites_events'
+
+. 
+. gen rel_year = year - event_year
+
+. 
+. keep if rel_year >= -$L & rel_year <= $H
+(187,960 observations deleted)
+
+. 
+. sort dyad_id year event_year
+
+. by dyad_id year: keep if _n == 1
+(0 observations deleted)
+
+. 
+. foreach r of global rel_list {
+  2.         local relname = cond(`r' < 0, "rel_m" + strofreal(-`r'), "rel_" + s
+> trofreal(`r'))
+  3.         gen `relname' = (rel_year == `r')
+  4. }
+
+. drop rel_year
+
+. 
+. tempfile cites_es
+
+. save `cites_es', replace
+(file /scratch/2103229.1.p-int/St2198330.000008 not found)
+file /scratch/2103229.1.p-int/St2198330.000008 saved as .dta format
+
+. 
+. *------------------------------------------------------
+. * 2.4 PPML for citation flows (fractional counts)
+. *------------------------------------------------------
+. 
+. use `cites_es', clear
+
+. 
+. ppmlhdfe cite_frac ///
+>     rel_* , ///
+>     absorb(dyad_id source_year target_year) ///
+>     cluster(dyad_id)
+(dropped 65656 observations that are either singletons or separated by a fixed e
+> ffect)
+(ReLU separation check: maximum number of iterations reached; aborting)
+Iteration 1:   deviance = 7.7265e+06  eps = .         iters = 26   tol = 1.0e-04
+>   min(eta) =  -6.16  P   
+Iteration 2:   deviance = 2.0597e+06  eps = 2.75e+00  iters = 26   tol = 1.0e-04
+>   min(eta) =  -7.39      
+Iteration 3:   deviance = 6.8826e+05  eps = 1.99e+00  iters = 26   tol = 1.0e-04
+>   min(eta) =  -8.81      
+Iteration 4:   deviance = 2.4816e+05  eps = 1.77e+00  iters = 30   tol = 1.0e-04
+>   min(eta) = -10.85      
+Iteration 5:   deviance = 1.0949e+05  eps = 1.27e+00  iters = 28   tol = 1.0e-04
+>   min(eta) = -12.96      
+Iteration 6:   deviance = 6.8153e+04  eps = 6.06e-01  iters = 30   tol = 1.0e-04
+>   min(eta) = -14.81      
+Iteration 7:   deviance = 5.6869e+04  eps = 1.98e-01  iters = 22   tol = 1.0e-04
+>   min(eta) = -16.18      
+Iteration 8:   deviance = 5.4237e+04  eps = 4.85e-02  iters = 17   tol = 1.0e-04
+>   min(eta) = -16.90      
+Iteration 9:   deviance = 5.3755e+04  eps = 8.96e-03  iters = 16   tol = 1.0e-04
+>   min(eta) = -17.93      
+Iteration 10:  deviance = 5.3690e+04  eps = 1.21e-03  iters = 14   tol = 1.0e-04
+>   min(eta) = -18.68      
+Iteration 11:  deviance = 5.3683e+04  eps = 1.41e-04  iters = 14   tol = 1.0e-04
+>   min(eta) = -19.79      
+Iteration 12:  deviance = 5.3681e+04  eps = 2.00e-05  iters = 9    tol = 1.0e-04
+>   min(eta) = -21.64      
+Iteration 13:  deviance = 5.3680e+04  eps = 1.91e-05  iters = 27   tol = 1.0e-05
+>   min(eta) = -22.96      
+Iteration 14:  deviance = 5.3680e+04  eps = 4.41e-06  iters = 20   tol = 1.0e-05
+>   min(eta) = -24.48      
+Iteration 15:  deviance = 5.3680e+04  eps = 3.94e-06  iters = 46   tol = 1.0e-06
+>   min(eta) = -25.31   S  
+Iteration 16:  deviance = 5.3680e+04  eps = 1.38e-06  iters = 45   tol = 1.0e-06
+>   min(eta) = -26.99   S  
+Iteration 17:  deviance = 5.3680e+04  eps = 3.03e-09  iters = 5    tol = 1.0e-06
+>   min(eta) = -26.98   S  
+Iteration 18:  deviance = 5.3680e+04  eps = 6.28e-07  iters = 86   tol = 1.0e-07
+>   min(eta) = -28.13   S  
+Iteration 19:  deviance = 5.3680e+04  eps = 2.31e-07  iters = 97   tol = 1.0e-07
+>   min(eta) = -29.16   S  
+Iteration 20:  deviance = 5.3680e+04  eps = 7.38e-11  iters = 6    tol = 1.0e-07
+>   min(eta) = -29.16   S  
+Iteration 21:  deviance = 5.3680e+04  eps = 6.75e-10  iters = 15   tol = 1.0e-09
+>   min(eta) = -29.16   S O
+--------------------------------------------------------------------------------
+> ----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon b
+> elow tolerance)
+Converged in 21 iterations and 605 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     35,320
+Absorbing 3 HDFE groups                           Residual df     =      4,419
+Statistics robust to heteroskedasticity           Wald chi2(8)    =      14.09
+Deviance             =  53679.86935               Prob > chi2     =     0.0794
+Log pseudolikelihood = -67563.36669               Pseudo R2       =     0.9994
+
+Number of clusters (dyad_id)=      4,420
+                            (Std. err. adjusted for 4,420 clusters in dyad_id)
+------------------------------------------------------------------------------
+             |               Robust
+   cite_frac | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      rel_m3 |  -.0081167    .016492    -0.49   0.623    -.0404404     .024207
+      rel_m2 |  -.0002374   .0096466    -0.02   0.980    -.0191444    .0186696
+       rel_0 |   .0142712    .010379     1.38   0.169    -.0060712    .0346136
+       rel_1 |   .0388793   .0135419     2.87   0.004     .0123376     .065421
+       rel_2 |   .0363568   .0162318     2.24   0.025      .004543    .0681706
+       rel_3 |   .0407366    .020868     1.95   0.051    -.0001639    .0816372
+       rel_4 |   .0583808    .024602     2.37   0.018     .0101618    .1065997
+       rel_5 |   .0507247   .0291772     1.74   0.082    -.0064617     .107911
+       _cons |   12.21993   .0140609   869.07   0.000     12.19237    12.24749
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+     dyad_id |      4420        4420           0    *|
+ source_year |      2334           1        2333     |
+ target_year |      2521          23        2498     |
+-----------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. 
+. estimates store ppml_cites
+
+. 
+. _export_table_with_plot, dv(cite_frac) es(ppml_cites) title("PPML for citation
+>  flows (fractional counts)") outdoc("$tables/eventstudy_cites_ppml.docx") ntre
+> at(`=N_treated_cites') nctrl(`=N_control_cites')
+file ./figs/eventstudy_cites_ppml.png saved as PNG format
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+(note: table eff has been redefined)
+successfully replaced "/projectnb/glob-s/Khoa/geopolitical-shocks-innovation/tab
+> les/eventstudy_cites_ppml.docx"
+
+. 
+. *******************************************************
+. * 3. Close log
+. *******************************************************
+. 
+. log close
+      name:  <unnamed>
+       log:  /projectnb/glob-s/Khoa/geopolitical-shocks-innovation/logs/brsi_eve
+> ntstudy_baseline.log
+  log type:  text
+ closed on:   5 Dec 2025, 20:28:19
+--------------------------------------------------------------------------------
